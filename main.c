@@ -1,18 +1,16 @@
 #include "graph.h"
 
 /*
-   Reads graph information from a text file.
-
-   File structure:
-   - Line 1  : total number of vertices
-   - Next lines : startVertex,endVertex,edgeWeight
+   Reads an unweighted graph from a file.
+   Each edge entry only contains source
+   and destination vertex values.
 */
-Graph read_graph_file(char *path) {
-    FILE *fp = fopen(path, "r");
+Graph load_graph_unweighted(char *filename) {
 
-    // verify that the file opened correctly
-    if (fp == NULL) {
-        printf("unable to access file: %s\n", path);
+    FILE *file = fopen(filename, "r");
+
+    if (file == NULL) {
+        printf("unable to open file %s\n", filename);
 
         Graph empty_graph = {0, NULL};
         return empty_graph;
@@ -20,42 +18,39 @@ Graph read_graph_file(char *path) {
 
     int total_vertices;
 
-    // get number of vertices from the first line
-    fscanf(fp, "%d", &total_vertices);
+    fscanf(file, "%d", &total_vertices);
 
-    Graph graph = create_graph(total_vertices);
+    Graph g = create_graph(total_vertices);
 
-    int start;
-    int end;
-    int weight;
+    int source;
+    int destination;
 
-    // keep reading edges until the file ends
-    while (fscanf(fp, "%d,%d,%d", &start, &end, &weight) == 3) {
-        add_edge(&graph, start, end, weight);
+    /* Read edges until no more data exists */
+    while (fscanf(file, "%d,%d", &source, &destination) == 2) {
+        add_edge(&g, source, destination, 0);
     }
 
-    // release file resource
-    fclose(fp);
+    fclose(file);
 
-    return graph;
+    return g;
 }
 
 int main() {
-    printf("=== week 8 - graph file loading ===\n\n");
 
-    // create graph using file data
-    Graph graph = read_graph_file("graph.txt");
+    printf("=== week 9 - pagerank ===\n\n");
 
-    printf("graph adjacency list:\n");
-    print_graph(&graph);
+    Graph g = load_graph_unweighted("pagerank_test.txt");
+
+    printf("graph has %d vertices\n\n", g.V);
+
+    print_in_degrees(&g);
 
     printf("\n");
 
-    // display incoming edge count for every vertex
-    print_in_degrees(&graph);
+    /* Execute PageRank repeatedly to refine scores */
+    pagerank(&g, 100);
 
-    // clear allocated memory
-    destroy_graph(&graph);
+    destroy_graph(&g);
 
     return 0;
 }

@@ -1,9 +1,5 @@
 #include "graph.h"
 
-/* 
-   Allocate memory for a graph and initialise
-   every adjacency list as empty.
-*/
 Graph create_graph(int v) {
     Graph g;
 
@@ -17,97 +13,136 @@ Graph create_graph(int v) {
     return g;
 }
 
-/*
-   Adds a new connection from one vertex
-   to another using head insertion.
-*/
 void add_edge(Graph *self, int from, int to, int w) {
-    EdgeNodePtr new_node = malloc(sizeof *new_node);
+    EdgeNodePtr node = malloc(sizeof *node);
 
-    new_node->edge.to_vertex = to;
-    new_node->edge.weight = w;
+    node->edge.to_vertex = to;
+    node->edge.weight = w;
 
-    new_node->next = self->edges[from].head;
-    self->edges[from].head = new_node;
+    node->next = self->edges[from].head;
+    self->edges[from].head = node;
 }
 
-/*
-   Displays all vertices together with
-   their connected neighbours and weights.
-*/
 void print_graph(Graph *self) {
     for (int i = 0; i < self->V; i++) {
-
         printf("%d -> ", i);
 
-        EdgeNodePtr current = self->edges[i].head;
+        EdgeNodePtr node = self->edges[i].head;
 
-        while (current != NULL) {
-            printf("(%d, w=%d) ",
-                   current->edge.to_vertex,
-                   current->edge.weight);
-
-            current = current->next;
+        while (node != NULL) {
+            printf("(%d) ", node->edge.to_vertex);
+            node = node->next;
         }
 
         printf("\n");
     }
 }
 
-/*
-   Counts how many incoming edges each
-   vertex receives and prints the totals.
-*/
 void print_in_degrees(Graph *self) {
-
-    int *in_degrees = malloc(self->V * sizeof(int));
+    int *incoming_count = malloc(self->V * sizeof(int));
 
     for (int i = 0; i < self->V; i++) {
-        in_degrees[i] = 0;
+        incoming_count[i] = 0;
     }
 
     for (int i = 0; i < self->V; i++) {
+        EdgeNodePtr node = self->edges[i].head;
 
-        EdgeNodePtr current = self->edges[i].head;
-
-        while (current != NULL) {
-
-            in_degrees[current->edge.to_vertex]++;
-
-            current = current->next;
+        while (node != NULL) {
+            incoming_count[node->edge.to_vertex]++;
+            node = node->next;
         }
     }
 
     printf("in-degrees:\n");
 
     for (int i = 0; i < self->V; i++) {
-        printf("  vertex %d: %d\n", i, in_degrees[i]);
+        printf("  vertex %d: %d\n", i, incoming_count[i]);
     }
 
-    free(in_degrees);
+    free(incoming_count);
 }
 
-/*
-   Frees every node in the adjacency lists
-   and releases dynamically allocated memory.
-*/
 void destroy_graph(Graph *self) {
-
     for (int i = 0; i < self->V; i++) {
+        EdgeNodePtr node = self->edges[i].head;
 
-        EdgeNodePtr current = self->edges[i].head;
-
-        while (current != NULL) {
-
-            EdgeNodePtr temp = current;
-
-            current = current->next;
-
-            free(temp);
+        while (node != NULL) {
+            EdgeNodePtr next_node = node->next;
+            free(node);
+            node = next_node;
         }
     }
 
     free(self->edges);
-
     self->V = 0;
+}
+
+/*
+   Runs a basic PageRank calculation for a fixed number of rounds.
+   Each vertex begins with rank 1.0, then passes its score evenly
+   across its outgoing links during every iteration.
+*/
+void pagerank(Graph *self, int iterations) {
+    int vertex_count = self->V;
+    double damping = 0.85;
+
+    /* Store how many outgoing links each vertex has */
+    double *outgoing_count = malloc(vertex_count * sizeof(double));
+
+    for (int i = 0; i < vertex_count; i++) {
+        outgoing_count[i] = 0;
+
+        EdgeNodePtr node = self->edges[i].head;
+
+        while (node != NULL) {
+            outgoing_count[i]++;
+            node = node->next;
+        }
+    }
+
+    /* Starting rank value for every vertex */
+    double *rank = malloc(vertex_count * sizeof(double));
+
+    for (int i = 0; i < vertex_count; i++) {
+        rank[i] = 1.0;
+    }
+
+    double *received_rank = malloc(vertex_count * sizeof(double));
+
+    for (int round = 0; round < iterations; round++) {
+
+        /* Clear the amount collected by each vertex */
+        for (int i = 0; i < vertex_count; i++) {
+            received_rank[i] = 0.0;
+        }
+
+        /* Distribute rank from each vertex to its neighbours */
+        for (int i = 0; i < vertex_count; i++) {
+            if (outgoing_count[i] > 0) {
+                EdgeNodePtr node = self->edges[i].head;
+
+                while (node != NULL) {
+                    int target = node->edge.to_vertex;
+                    received_rank[target] += rank[i] / outgoing_count[i];
+                    node = node->next;
+                }
+            }
+        }
+
+        /* Apply damping to calculate the next rank values */
+        for (int i = 0; i < vertex_count; i++) {
+            rank[i] = (1.0 - damping) + damping * received_rank[i];
+        }
+    }
+
+    printf("pagerank results after %d iterations:\n", iterations);
+
+    for (int i = 0; i < vertex_count; i++) {
+        printf("  vertex %d: %.4f\n", i, rank[i]);
+    }
+
+    free(rank);
+    free(received_rank);
+    free(outgoing_count);
 }
